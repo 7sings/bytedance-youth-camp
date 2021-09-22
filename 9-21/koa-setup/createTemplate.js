@@ -11,6 +11,7 @@ import { fileURLToPath } from "url";
  * @returns {string}
  */
 export function createTemplate(templateFile, config) {
+  //__dirname polyfill
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   const template = fs
@@ -23,11 +24,9 @@ export function createTemplate(templateFile, config) {
     packageName: config.packageName,
   });
 
-  let parser;
+  let parser = "babel";
   if (templateFile.indexOf("package") > -1) {
     parser = "json";
-  } else {
-    parser = "babel";
   }
 
   return prettier.format(code, {

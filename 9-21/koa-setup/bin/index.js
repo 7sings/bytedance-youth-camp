@@ -11,7 +11,7 @@ import { resolve } from "path";
 const answer = await question();
 // console.log(answer);
 const config = createConfig(answer);
-console.log(config);
+// console.log(config);
 
 //核心：自动化思维
 //1.创建文件夹
@@ -38,6 +38,7 @@ await execa(command, ["install"], {
   stdio: [2, 2, 2],
 });
 
+//5.提示创建完毕
 console.log(`
   successful!
   cd ${answer.packageName}
