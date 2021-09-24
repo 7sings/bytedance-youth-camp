@@ -1,0 +1,44 @@
+<div id="app">{{title}}</div>
+<script>
+  const Vue = {
+    createApp(options) {
+      return {
+        compile(template) {
+          //返回一个render函数
+          // parse->ast->genrate->ast=>render
+          return function () {
+            const h3 = document.createElement("h3");
+            h3.textContent = this.title;
+            return h3;
+          };
+        },
+        mount(selector) {
+          //1.找到宿主元素
+          const parent = document.querySelector(selector);
+          //2.渲染页面
+          if (!options.render) {
+            //2.1处理template：编译
+            options.render = this.compile(parent.innerHTML);
+          }
+          //2.2调用render
+
+          const el = options.render.call(options.data());
+          parent.innerHTML = "";
+          parent.appendChild(el);
+        },
+      };
+    },
+  };
+</script>
+<script>
+  //实例创建
+  const app = Vue.createApp({
+    data() {
+      return {
+        title: "hello vue3",
+      };
+    },
+  });
+
+  app.mount("#app");
+</script>

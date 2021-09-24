@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hello vue</title>
+  </head>
+  <body>
+    <div id="app">{{title}}</div>
+    <script src="http://unpkg.com/vue@next"></script>
+    <script>
+      //实例创建
+      const app = Vue.createApp({
+        data() {
+          return {
+            title: "hello vue3",
+          };
+        },
+        setup() {
+          //hook
+          const state = Vue.reactive({
+            title: "vue3 hello",
+          });
+          setTimeout(() => {
+            state.title = "new Title";
+          });
+
+          return state;
+        },
+      });
+
+      app.mount("#app");
+    </script>
+  </body>
+</html>
