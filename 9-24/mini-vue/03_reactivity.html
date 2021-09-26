@@ -36,8 +36,6 @@
                   //先从setup中取，如果取不到再从data中取
                   if (target.setupState && key in target.setupState) {
                     return target.setupState[key];
-                  } else {
-                    return target.data[key];
                   }
                 },
                 set(target, key, val) {
@@ -49,10 +47,13 @@
                 },
               });
               //2.2调用render
-              console.log(proxy.__proto__);
-              const el = options.render.call(proxy);
-              parent.innerHTML = "";
-              insert(el, parent);
+              this.update = effect(() => {
+                const el = options.render.call(proxy);
+
+                parent.innerHTML = "";
+                insert(el, parent);
+              });
+              this.update();
             },
           };
         },
@@ -73,17 +74,96 @@
   };
 </script>
 <script>
+  //能够拦截用户对代理对象的访问
+  //从而在值发生变化的时候做出响应式
+  function reactive(obj) {
+    //vue2
+    //缺点：性能、api、内部实现、数据结构支持
+    // Object.defineProperty(obj,{
+
+    // })
+    return new Proxy(obj, {
+      get(target, key) {
+        console.log("get key:", key);
+        track(target, key);
+
+        console.log(targetMap);
+        console.log(target[key]);
+        return target[key];
+      },
+      set(target, key, val) {
+        target[key] = val;
+        //通知更新
+        trigger(target, key);
+      },
+    });
+  }
+  //effect调用可能会嵌套，不能仅仅是一个变量
+  const effectStack = [];
+
+  const targetMap = {};
+
+  //1.将fn临时保存在effectStack
+  function effect(fn) {
+    const eff = function () {
+      try {
+        effectStack.push(eff);
+        fn();
+      } catch (err) {
+        console.log(err);
+      } finally {
+        effectStack.pop();
+      }
+    };
+    eff();
+    return eff;
+  }
+
+  //建立target,key和effect函数的联系
+  function track(target, key) {
+    const effect = effectStack[effectStack.length - 1];
+    //判断target为key的对象是否存在
+    let map = targetMap[target];
+    if (!map) {
+      //首次get这个target
+      map = targetMap[target] = {};
+    }
+    let deps = map[key];
+    if (!deps) {
+      deps = map[key] = [];
+    }
+    //映射关系建立
+    if (deps.indexOf(effect) === -1) {
+      deps.push(effect);
+    }
+  }
+
+  function trigger(target, key) {
+    const map = targetMap[target];
+    if (map) {
+      const deps = map[key];
+      if (deps) {
+        deps.forEach((dep) => dep());
+      }
+    }
+  }
+
+  const obj = reactive({ foo: "foo" });
+  effect(() => {
+    console.log(obj.foo);
+  });
+  obj.foo = "bar";
+
   //实例创建
   const app = Vue.createApp({
-    data() {
-      return {
-        title: "hello vue3",
-      };
-    },
     setup() {
-      return {
-        title: "vue3 hello",
-      };
+      const state = reactive({
+        title: "vue3, hello!",
+      });
+      setTimeout(() => {
+        state.title = "hello, vue3!";
+      }, 2000);
+      return state;
     },
   });
 

@@ -1,0 +1,208 @@
+<div id="app">{{title}}</div>
+<script>
+  //传入节点信息，返回VNode
+  function h(tag, props, children) {
+    return {
+      tag,
+      props,
+      children,
+    };
+  }
+  const Vue = {
+    //扩展性
+    createRenderer({ querySelector, insert, createElement }) {
+      //返回渲染器
+      return {
+        createApp(options) {
+          return {
+            // 递归创建节点
+            createElm({ tag, props, children }) {
+              //遍历vnode，创建整棵树
+              const el = createElement(tag);
+              //设置属性
+              // props.forEach(prop=>{
+              //   el.setA
+              // })
+              //判断children类型
+              if (typeof children === "string") {
+                el.textContent = children;
+              } else {
+                children.forEach((child) => insert(this.createElm(child), el));
+              }
+              return el;
+            },
+            compile(template) {
+              //返回一个render函数
+              // parse->ast->genrate->ast=>render
+              return function render() {
+                // return h("h3", null, this.title);
+                return h("div", null, [
+                  h("h3", null, this.title),
+                  h("h3", null, "this.title"),
+                ]);
+              };
+            },
+            mount(selector) {
+              //1.找到宿主元素
+              const parent = querySelector(selector);
+              //2.渲染页面
+              if (!options.render) {
+                //2.1处理template：编译
+                options.render = this.compile(parent.innerHTML);
+              }
+              if (options.setup) {
+                this.setupState = options.setup();
+              }
+              if (options.data) {
+                this.data = options.data;
+              }
+              //setup和其他选项
+              const proxy = new Proxy(this, {
+                get(target, key) {
+                  //先从setup中取，如果取不到再从data中取
+                  if (target.setupState && key in target.setupState) {
+                    return target.setupState[key];
+                  }
+                },
+                set(target, key, val) {
+                  if (target.setupState && key in target.setupState) {
+                    target.setupState[key] = val;
+                  } else {
+                    target.data[key] = val;
+                  }
+                },
+              });
+              //2.2调用render
+              this.update = effect(() => {
+                const vnode = options.render.call(proxy);
+                //转换vnode为dom
+                //初始创建整棵树
+                if (!this.isMounted) {
+                  //实现createElm,
+                  const el = this.createElm(vnode);
+                  parent.innerHTML = "";
+                  insert(el, parent);
+                  //init
+                  this.isMounted = true;
+                } else {
+                  //todo
+                }
+              });
+              this.update();
+            },
+          };
+        },
+      };
+    },
+    createApp(options) {
+      //创建一个web平台特有的渲染器
+      const render = Vue.createRenderer({
+        querySelector(sel) {
+          return document.querySelector(sel);
+        },
+        insert(el, parent) {
+          parent.appendChild(el);
+        },
+        createElement(tag) {
+          return document.createElement(tag);
+        },
+      });
+      return render.createApp(options);
+    },
+  };
+</script>
+<script>
+  //能够拦截用户对代理对象的访问
+  //从而在值发生变化的时候做出响应式
+  function reactive(obj) {
+    //vue2
+    //缺点：性能、api、内部实现、数据结构支持
+    // Object.defineProperty(obj,{
+
+    // })
+    return new Proxy(obj, {
+      get(target, key) {
+        console.log("get key:", key);
+        track(target, key);
+        // console.log(targetMap);
+        return target[key];
+      },
+      set(target, key, val) {
+        target[key] = val;
+        //通知更新
+        trigger(target, key);
+      },
+    });
+  }
+  //effect调用可能会嵌套，不能仅仅是一个变量
+  const effectStack = [];
+
+  const targetMap = {};
+
+  //1.将fn临时保存在effectStack
+  function effect(fn) {
+    const eff = function () {
+      try {
+        effectStack.push(eff);
+        fn();
+      } catch (err) {
+        console.log(err);
+      } finally {
+        effectStack.pop();
+      }
+    };
+    eff();
+    return eff;
+  }
+
+  //建立target,key和effect函数的联系
+  function track(target, key) {
+    const effect = effectStack[effectStack.length - 1];
+    //判断target为key的对象是否存在
+    let map = targetMap[target];
+    if (!map) {
+      //首次get这个target
+      map = targetMap[target] = {};
+    }
+    let deps = map[key];
+    if (!deps) {
+      deps = map[key] = [];
+    }
+    //映射关系建立
+    if (deps.indexOf(effect) === -1) {
+      deps.push(effect);
+    }
+  }
+
+  function trigger(target, key) {
+    const map = targetMap[target];
+    if (map) {
+      const deps = map[key];
+      if (deps) {
+        deps.forEach((dep) => dep());
+      }
+    }
+  }
+
+  const obj = reactive({ foo: "foo" });
+  console.log(obj);
+  effect(() => {
+    console.log(obj.foo);
+  });
+  obj.foo = "bar";
+
+  //实例创建
+  const app = Vue.createApp({
+    setup() {
+      const state = reactive({
+        title: "vue3, hello!",
+      });
+      setTimeout(() => {
+        state.title = "hello, vue3!";
+      }, 2000);
+      return state;
+    },
+  });
+
+  app.mount("#app");
+</script>
